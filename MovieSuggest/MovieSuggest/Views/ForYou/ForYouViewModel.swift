@@ -70,18 +70,22 @@ final class ForYouViewModel: ObservableObject {
         var seedHitsByID: [Int: Int] = [:]
         var moviesByID: [Int: TMDBMovie] = [:]
 
-        let topFavorites = library
+        // Extract plain ids on the main actor before crossing into the task
+        // group: `Movie` is a main-actor-bound SwiftData model, not Sendable,
+        // so it must never be captured directly by a concurrent child task.
+        let topFavoriteIDs = library
             .filter(\.isFavorite)
             .sorted { ($0.favoritedAt ?? .distantPast) > ($1.favoritedAt ?? .distantPast) }
             .prefix(5)
+            .map(\.tmdbID)
 
         await withTaskGroup(of: [TMDBMovie].self) { group in
-            for favorite in topFavorites {
+            for favoriteID in topFavoriteIDs {
                 group.addTask { [tmdbClient] in
-                    if let recommended = try? await tmdbClient.recommendations(for: favorite.tmdbID), !recommended.results.isEmpty {
+                    if let recommended = try? await tmdbClient.recommendations(for: favoriteID), !recommended.results.isEmpty {
                         return recommended.results
                     }
-                    return (try? await tmdbClient.similar(to: favorite.tmdbID))?.results ?? []
+                    return (try? await tmdbClient.similar(to: favoriteID))?.results ?? []
                 }
             }
             for await movies in group {

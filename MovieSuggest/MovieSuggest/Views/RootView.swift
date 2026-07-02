@@ -10,9 +10,9 @@ struct RootView: View {
         Group {
             if hasKey && settingsStore.hasCompletedOnboarding {
                 TabView {
-                    ForYouView()
+                    ForYouView(tmdbClient: tmdbClient)
                         .tabItem { Label("For You", systemImage: "sparkles") }
-                    DiscoverView()
+                    DiscoverView(tmdbClient: tmdbClient)
                         .tabItem { Label("Discover", systemImage: "magnifyingglass") }
                     MyMoviesView()
                         .tabItem { Label("My Movies", systemImage: "film.stack") }
