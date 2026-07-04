@@ -33,12 +33,16 @@ final class GenreStore: ObservableObject {
     }
 
     func refresh(using client: TMDBClient) async {
-        guard let fetched = try? await client.genres() else { return }
+        guard let fetched = try? await client.genres() else {
+            Log.app.error("GenreStore: refresh failed, keeping cached \(self.namesByID.count, privacy: .public) genre(s)")
+            return
+        }
         var mapping: [Int: String] = [:]
         for genre in fetched { mapping[genre.id] = genre.name }
         namesByID = mapping
         genres = fetched.sorted { $0.name < $1.name }
         let stringKeyed = Dictionary(uniqueKeysWithValues: mapping.map { (String($0.key), $0.value) })
         defaults.set(stringKeyed, forKey: Self.cacheKey)
+        Log.app.info("GenreStore: refreshed \(fetched.count, privacy: .public) genres")
     }
 }

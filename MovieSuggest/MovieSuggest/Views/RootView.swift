@@ -36,6 +36,7 @@ struct RootView: View {
             // (onboarding just completed, or a removed key was re-added),
             // not just once before a key exists.
             guard isUnlocked else { return }
+            Log.app.notice("app unlocked, refreshing genre cache")
             await genreStore.refresh(using: tmdbClient)
         }
     }

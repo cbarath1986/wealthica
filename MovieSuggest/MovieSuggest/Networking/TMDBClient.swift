@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import os
 
 enum TMDBError: LocalizedError {
     case missingAPIKey
@@ -115,31 +116,47 @@ actor TMDBClient {
         apiKeyOverride: String? = nil
     ) async throws -> T {
         let key = apiKeyOverride ?? apiKeyProvider()
-        guard let key, !key.isEmpty else { throw TMDBError.missingAPIKey }
+        guard let key, !key.isEmpty else {
+            Log.network.error("\(path, privacy: .public): no API key set")
+            throw TMDBError.missingAPIKey
+        }
 
         var components = URLComponents(string: "https://api.themoviedb.org/3" + path)!
         components.queryItems = [URLQueryItem(name: "api_key", value: key)] + query
+
+        let started = Date()
+        Log.network.debug("→ \(path, privacy: .public) \(query.count, privacy: .public) query param(s)")
 
         let data: Data
         let response: URLResponse
         do {
             (data, response) = try await session.data(from: components.url!)
         } catch {
+            Log.network.error("✗ \(path, privacy: .public) network error: \(error.localizedDescription, privacy: .public)")
             throw TMDBError.network(underlying: error)
         }
 
-        switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
+        let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+        switch statusCode {
         case 200...299:
             do {
-                return try decoder.decode(T.self, from: data)
+                let decoded = try decoder.decode(T.self, from: data)
+                Log.network.debug("← \(path, privacy: .public) \(statusCode, privacy: .public) in \(elapsedMs, privacy: .public)ms (\(data.count, privacy: .public) bytes)")
+                return decoded
             } catch {
+                Log.network.error("✗ \(path, privacy: .public) decode failed: \(error.localizedDescription, privacy: .public)")
                 throw TMDBError.decoding(underlying: error)
             }
         case 401:
+            Log.network.error("✗ \(path, privacy: .public) 401 invalid API key")
             throw TMDBError.invalidAPIKey
         case 429:
+            Log.network.notice("✗ \(path, privacy: .public) 429 rate limited")
             throw TMDBError.rateLimited
         case let statusCode:
+            Log.network.error("✗ \(path, privacy: .public) unexpected status \(statusCode, privacy: .public)")
             throw TMDBError.server(statusCode: statusCode)
         }
     }

@@ -35,9 +35,12 @@ final class ForYouViewModel: ObservableObject {
             )
         }
 
+        Log.recommendation.debug("refresh: library=\(library.count, privacy: .public) genres=\(preferredGenreIDs.count, privacy: .public) langs=\(preferredLanguages.count, privacy: .public)")
+
         do {
             if libraryItems.isEmpty {
                 isColdStart = true
+                Log.recommendation.info("cold start: empty library, using trending + preferred genres")
                 var moviesByID: [Int: TMDBMovie] = [:]
                 if let trending = try? await tmdbClient.trending() {
                     for movie in trending.results { moviesByID[movie.id] = movie }
@@ -71,6 +74,7 @@ final class ForYouViewModel: ObservableObject {
                     strictGenreFilter: strictGenreFilter,
                     limit: 30
                 )
+                Log.recommendation.info("cold start: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")
                 return
             }
 
@@ -90,9 +94,12 @@ final class ForYouViewModel: ObservableObject {
                 strictGenreFilter: strictGenreFilter,
                 limit: 30
             )
+            Log.recommendation.info("personalized: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")
         } catch let error as TMDBError {
+            Log.recommendation.error("refresh failed: \(error.errorDescription ?? "unknown", privacy: .public)")
             errorMessage = error.errorDescription
         } catch {
+            Log.recommendation.error("refresh failed: \(error.localizedDescription, privacy: .public)")
             errorMessage = error.localizedDescription
         }
     }

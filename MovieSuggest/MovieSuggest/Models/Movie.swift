@@ -94,7 +94,10 @@ extension ModelContext {
         }
         change(movie)
         if !movie.isWatched && !movie.isFavorite {
+            Log.library.info("removed \"\(movie.title, privacy: .public)\" (tmdbID \(movie.tmdbID, privacy: .public)) from library")
             delete(movie)
+        } else {
+            Log.library.info("\"\(movie.title, privacy: .public)\" (tmdbID \(movie.tmdbID, privacy: .public)): watched=\(movie.isWatched, privacy: .public) favorite=\(movie.isFavorite, privacy: .public)")
         }
     }
 }

@@ -33,7 +33,9 @@ enum APIKeyStore {
         SecItemDelete(query as CFDictionary)
         var attributes = query
         attributes[kSecValueData as String] = data
-        SecItemAdd(attributes as CFDictionary, nil)
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        // Never log the key itself — only whether the save succeeded.
+        Log.settings.notice("APIKeyStore: save \(status == errSecSuccess ? "succeeded" : "failed", privacy: .public)")
     }
 
     static func remove() {
@@ -43,5 +45,6 @@ enum APIKeyStore {
             kSecAttrAccount as String: account,
         ]
         SecItemDelete(query as CFDictionary)
+        Log.settings.notice("APIKeyStore: key removed")
     }
 }

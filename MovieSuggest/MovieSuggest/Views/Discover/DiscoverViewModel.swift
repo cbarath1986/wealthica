@@ -44,7 +44,9 @@ final class DiscoverViewModel: ObservableObject {
             let response = try await tmdbClient.trending()
             results = response.results
             errorMessage = nil
+            Log.network.debug("Discover: trending loaded \(response.results.count, privacy: .public) movies")
         } catch let error as TMDBError where !error.isCancellation {
+            Log.network.error("Discover: trending failed: \(error.errorDescription ?? "unknown", privacy: .public)")
             errorMessage = error.errorDescription
         } catch {
             errorMessage = error.localizedDescription
@@ -58,7 +60,9 @@ final class DiscoverViewModel: ObservableObject {
             let response = try await tmdbClient.searchMovies(query: text)
             results = response.results
             errorMessage = nil
+            Log.network.debug("Discover: search \"\(text, privacy: .public)\" -> \(response.results.count, privacy: .public) results")
         } catch let error as TMDBError where !error.isCancellation {
+            Log.network.error("Discover: search \"\(text, privacy: .public)\" failed: \(error.errorDescription ?? "unknown", privacy: .public)")
             errorMessage = error.errorDescription
         } catch {
             errorMessage = error.localizedDescription
