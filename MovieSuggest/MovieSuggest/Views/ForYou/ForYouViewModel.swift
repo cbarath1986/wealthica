@@ -15,7 +15,13 @@ final class ForYouViewModel: ObservableObject {
         self.tmdbClient = tmdbClient
     }
 
-    func refresh(library: [Movie], preferredLanguages: Set<String>, strictLanguageFilter: Bool) async {
+    func refresh(
+        library: [Movie],
+        preferredLanguages: Set<String>,
+        strictLanguageFilter: Bool,
+        preferredGenreIDs: Set<Int>,
+        strictGenreFilter: Bool
+    ) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -32,25 +38,56 @@ final class ForYouViewModel: ObservableObject {
         do {
             if libraryItems.isEmpty {
                 isColdStart = true
-                let trending = try await tmdbClient.trending()
-                let candidates = trending.results.map { Candidate(movie: $0, seedHits: 0) }
+                var moviesByID: [Int: TMDBMovie] = [:]
+                if let trending = try? await tmdbClient.trending() {
+                    for movie in trending.results { moviesByID[movie.id] = movie }
+                }
+                // With no watch history there's no implicit taste to lean
+                // on, so an explicit genre preference is the only signal
+                // available to shape the cold-start feed beyond trending.
+                if !preferredGenreIDs.isEmpty {
+                    let genreIDs = Array(preferredGenreIDs)
+                    let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
+                    await withTaskGroup(of: [TMDBMovie].self) { group in
+                        for language in languages {
+                            group.addTask { [tmdbClient] in
+                                (try? await tmdbClient.discover(genreIDs: genreIDs, originalLanguage: language))?.results ?? []
+                            }
+                        }
+                        for await movies in group {
+                            for movie in movies where moviesByID[movie.id] == nil {
+                                moviesByID[movie.id] = movie
+                            }
+                        }
+                    }
+                }
+                let candidates = moviesByID.values.map { Candidate(movie: $0, seedHits: 0) }
                 recommendations = RecommendationEngine.score(
                     candidates: candidates,
                     library: [],
                     preferredLanguages: preferredLanguages,
                     strictLanguageFilter: false,
+                    preferredGenreIDs: preferredGenreIDs,
+                    strictGenreFilter: strictGenreFilter,
                     limit: 30
                 )
                 return
             }
 
             isColdStart = false
-            let candidates = try await gatherCandidates(library: library, libraryItems: libraryItems, preferredLanguages: preferredLanguages)
+            let candidates = try await gatherCandidates(
+                library: library,
+                libraryItems: libraryItems,
+                preferredLanguages: preferredLanguages,
+                preferredGenreIDs: preferredGenreIDs
+            )
             recommendations = RecommendationEngine.score(
                 candidates: candidates,
                 library: libraryItems,
                 preferredLanguages: preferredLanguages,
                 strictLanguageFilter: strictLanguageFilter,
+                preferredGenreIDs: preferredGenreIDs,
+                strictGenreFilter: strictGenreFilter,
                 limit: 30
             )
         } catch let error as TMDBError {
@@ -66,7 +103,8 @@ final class ForYouViewModel: ObservableObject {
     private func gatherCandidates(
         library: [Movie],
         libraryItems: [LibraryItem],
-        preferredLanguages: Set<String>
+        preferredLanguages: Set<String>,
+        preferredGenreIDs: Set<Int>
     ) async throws -> [Candidate] {
         var seedHitsByID: [Int: Int] = [:]
         var moviesByID: [Int: TMDBMovie] = [:]
@@ -97,12 +135,14 @@ final class ForYouViewModel: ObservableObject {
             }
         }
 
-        let topGenres = RecommendationEngine.topGenres(library: libraryItems)
+        // Combine genres inferred from watch history with any explicit
+        // preference so the discover query reflects both signals.
+        let discoverGenres = Array(Set(RecommendationEngine.topGenres(library: libraryItems)).union(preferredGenreIDs))
         let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
         await withTaskGroup(of: [TMDBMovie].self) { group in
             for language in languages {
                 group.addTask { [tmdbClient] in
-                    (try? await tmdbClient.discover(genreIDs: topGenres, originalLanguage: language))?.results ?? []
+                    (try? await tmdbClient.discover(genreIDs: discoverGenres, originalLanguage: language))?.results ?? []
                 }
             }
             for await movies in group {

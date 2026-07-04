@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.tmdbClient) private var tmdbClient
     @EnvironmentObject private var settingsStore: SettingsStore
+    @EnvironmentObject private var genreStore: GenreStore
 
     @State private var apiKeyInput = ""
     @State private var isEditingKey = false
@@ -52,6 +53,19 @@ struct SettingsView: View {
                     Toggle("Only Preferred Languages", isOn: $settingsStore.strictLanguageFilter)
                 }
 
+                Section("Genres") {
+                    NavigationLink {
+                        GenrePickerView(genres: genreStore.genres, selection: $settingsStore.preferredGenreIDs)
+                    } label: {
+                        HStack {
+                            Text("Preferred Genres")
+                            Spacer()
+                            Text(genreSummary).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                    Toggle("Only Preferred Genres", isOn: $settingsStore.strictGenreFilter)
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: "1.0")
                     Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
@@ -71,6 +85,14 @@ struct SettingsView: View {
     private var languageSummary: String {
         settingsStore.preferredLanguages
             .compactMap { Language.named($0)?.englishName }
+            .sorted()
+            .joined(separator: ", ")
+    }
+
+    private var genreSummary: String {
+        guard !settingsStore.preferredGenreIDs.isEmpty else { return "Any" }
+        return settingsStore.preferredGenreIDs
+            .compactMap { genreStore.name(for: $0) }
             .sorted()
             .joined(separator: ", ")
     }

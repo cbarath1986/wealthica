@@ -8,15 +8,19 @@ final class GenreStore: ObservableObject {
     private static let cacheKey = "cachedGenres"
 
     @Published private(set) var namesByID: [Int: String] = [:]
+    /// All genres, alphabetized, for use in a picker UI.
+    @Published private(set) var genres: [TMDBGenre] = []
 
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let cached = defaults.dictionary(forKey: Self.cacheKey) as? [String: String] {
-            namesByID = Dictionary(uniqueKeysWithValues: cached.compactMap { key, value in
+            let mapping = Dictionary(uniqueKeysWithValues: cached.compactMap { key, value in
                 Int(key).map { ($0, value) }
             })
+            namesByID = mapping
+            genres = mapping.map { TMDBGenre(id: $0.key, name: $0.value) }.sorted { $0.name < $1.name }
         }
     }
 
@@ -29,10 +33,11 @@ final class GenreStore: ObservableObject {
     }
 
     func refresh(using client: TMDBClient) async {
-        guard let genres = try? await client.genres() else { return }
+        guard let fetched = try? await client.genres() else { return }
         var mapping: [Int: String] = [:]
-        for genre in genres { mapping[genre.id] = genre.name }
+        for genre in fetched { mapping[genre.id] = genre.name }
         namesByID = mapping
+        genres = fetched.sorted { $0.name < $1.name }
         let stringKeyed = Dictionary(uniqueKeysWithValues: mapping.map { (String($0.key), $0.value) })
         defaults.set(stringKeyed, forKey: Self.cacheKey)
     }

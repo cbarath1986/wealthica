@@ -85,4 +85,37 @@ final class RecommendationEngineTests: XCTestCase {
         let results = RecommendationEngine.score(candidates: [noSeed, withSeed], library: [], preferredLanguages: ["en"], now: now)
         XCTAssertEqual(results.first?.movie.id, 2)
     }
+
+    func testPreferredGenreBoostsMatchingCandidatesHigher() {
+        let candidates = [
+            Candidate(movie: movie(id: 10, genreIds: [28], language: "de", popularity: 10), seedHits: 0),
+            Candidate(movie: movie(id: 11, genreIds: [35], language: "de", popularity: 10), seedHits: 0),
+        ]
+        let results = RecommendationEngine.score(
+            candidates: candidates, library: [], preferredLanguages: ["en"],
+            preferredGenreIDs: [35], now: now
+        )
+        XCTAssertEqual(results.first?.movie.id, 11)
+    }
+
+    func testStrictGenreFilterExcludesNonMatching() {
+        let candidates = [
+            Candidate(movie: movie(id: 10, genreIds: [28], language: "en"), seedHits: 0),
+            Candidate(movie: movie(id: 11, genreIds: [35], language: "en"), seedHits: 0),
+        ]
+        let results = RecommendationEngine.score(
+            candidates: candidates, library: [], preferredLanguages: ["en"],
+            preferredGenreIDs: [35], strictGenreFilter: true, now: now
+        )
+        XCTAssertEqual(results.map(\.movie.id), [11])
+    }
+
+    func testEmptyPreferredGenreIDsPreservesOriginalWeighting() {
+        let library = [LibraryItem(tmdbID: 1, genreIDs: [28], isFavorite: true, referenceDate: now)]
+        let candidates = [Candidate(movie: movie(id: 10, genreIds: [28], language: "en"), seedHits: 0)]
+        let results = RecommendationEngine.score(candidates: candidates, library: library, preferredLanguages: ["en"], now: now)
+        // genreScore=1.0, seedScore=0, languageScore=1.0, qualityScore=0.7
+        // total = 0.45*1.0 + 0.25*0 + 0.20*1.0 + 0.10*0.7 = 0.72
+        XCTAssertEqual(results.first?.total ?? 0, 0.72, accuracy: 0.0001)
+    }
 }

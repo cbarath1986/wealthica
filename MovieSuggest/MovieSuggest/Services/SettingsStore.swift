@@ -8,6 +8,8 @@ final class SettingsStore: ObservableObject {
     private enum Keys {
         static let preferredLanguages = "preferredLanguages"
         static let strictLanguageFilter = "strictLanguageFilter"
+        static let preferredGenreIDs = "preferredGenreIDs"
+        static let strictGenreFilter = "strictGenreFilter"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
     }
 
@@ -19,6 +21,16 @@ final class SettingsStore: ObservableObject {
 
     @Published var strictLanguageFilter: Bool {
         didSet { defaults.set(strictLanguageFilter, forKey: Keys.strictLanguageFilter) }
+    }
+
+    /// Empty means "no explicit genre preference" — recommendations fall
+    /// back to genre affinity inferred from watch history alone.
+    @Published var preferredGenreIDs: Set<Int> {
+        didSet { defaults.set(Array(preferredGenreIDs), forKey: Keys.preferredGenreIDs) }
+    }
+
+    @Published var strictGenreFilter: Bool {
+        didSet { defaults.set(strictGenreFilter, forKey: Keys.strictGenreFilter) }
     }
 
     @Published var hasCompletedOnboarding: Bool {
@@ -33,6 +45,8 @@ final class SettingsStore: ObservableObject {
             preferredLanguages = [Language.deviceDefault]
         }
         strictLanguageFilter = defaults.bool(forKey: Keys.strictLanguageFilter)
+        preferredGenreIDs = Set(defaults.array(forKey: Keys.preferredGenreIDs) as? [Int] ?? [])
+        strictGenreFilter = defaults.bool(forKey: Keys.strictGenreFilter)
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
     }
 }

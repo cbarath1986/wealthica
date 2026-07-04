@@ -40,6 +40,8 @@ enum RecommendationEngine {
         library: [LibraryItem],
         preferredLanguages: Set<String>,
         strictLanguageFilter: Bool = false,
+        preferredGenreIDs: Set<Int> = [],
+        strictGenreFilter: Bool = false,
         now: Date = .now,
         limit: Int = 30
     ) -> [ScoredMovie] {
@@ -52,8 +54,11 @@ enum RecommendationEngine {
             let genreIDs = candidate.movie.genreIds ?? []
             let matchesLanguage = candidate.movie.originalLanguage
                 .map { preferredLanguages.contains($0) } ?? false
+            let matchesPreferredGenre = preferredGenreIDs.isEmpty
+                || !preferredGenreIDs.isDisjoint(with: genreIDs)
 
             if strictLanguageFilter && !matchesLanguage { return nil }
+            if strictGenreFilter && !preferredGenreIDs.isEmpty && !matchesPreferredGenre { return nil }
 
             let genreScores = genreIDs.compactMap { affinity[$0] }
             let genreScore = genreScores.isEmpty ? 0 : genreScores.reduce(0, +) / Double(genreScores.count)
@@ -61,10 +66,25 @@ enum RecommendationEngine {
             let languageScore = matchesLanguage ? 1.0 : 0.0
             let qualityScore = min(1.0, max(0.0, (candidate.movie.voteAverage ?? 0) / 10))
 
-            let total = 0.45 * genreScore
-                + 0.25 * seedScore
-                + 0.20 * languageScore
-                + 0.10 * qualityScore
+            // With no explicit genre preference, weight stays exactly as
+            // before (taste/seed/language/quality). Setting a preference
+            // adds it as its own term rather than diluting the others
+            // silently, redistributing weight from the terms it partially
+            // overlaps with (implicit taste, language).
+            let total: Double
+            if preferredGenreIDs.isEmpty {
+                total = 0.45 * genreScore
+                    + 0.25 * seedScore
+                    + 0.20 * languageScore
+                    + 0.10 * qualityScore
+            } else {
+                let genrePreferenceScore = matchesPreferredGenre ? 1.0 : 0.0
+                total = 0.35 * genreScore
+                    + 0.20 * seedScore
+                    + 0.15 * languageScore
+                    + 0.20 * genrePreferenceScore
+                    + 0.10 * qualityScore
+            }
 
             let topGenreID = genreIDs.max { (affinity[$0] ?? 0) < (affinity[$1] ?? 0) }
 

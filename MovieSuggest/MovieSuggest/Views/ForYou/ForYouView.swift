@@ -61,7 +61,9 @@ struct ForYouView: View {
         await viewModel.refresh(
             library: library,
             preferredLanguages: settingsStore.preferredLanguages,
-            strictLanguageFilter: settingsStore.strictLanguageFilter
+            strictLanguageFilter: settingsStore.strictLanguageFilter,
+            preferredGenreIDs: settingsStore.preferredGenreIDs,
+            strictGenreFilter: settingsStore.strictGenreFilter
         )
     }
 }
