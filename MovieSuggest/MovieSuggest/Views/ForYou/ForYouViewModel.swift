@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import Combine
 
 @MainActor
 final class ForYouViewModel: ObservableObject {

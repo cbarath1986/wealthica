@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 @MainActor
 final class DiscoverViewModel: ObservableObject {
@@ -19,9 +20,9 @@ final class DiscoverViewModel: ObservableObject {
     func queryChanged() {
         searchTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        errorMessage = nil
         guard !trimmed.isEmpty else {
-            results = []
-            errorMessage = nil
+            searchTask = Task { await loadTrending() }
             return
         }
         searchTask = Task {
