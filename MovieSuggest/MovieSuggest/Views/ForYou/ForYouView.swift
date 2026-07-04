@@ -41,6 +41,9 @@ struct ForYouView: View {
                     .padding()
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                genreFilterBar
+            }
             .navigationTitle("For You")
             .navigationDestination(for: Int.self) { movieID in
                 MovieDetailView(movieID: movieID)
@@ -48,6 +51,47 @@ struct ForYouView: View {
             .refreshable { await refresh() }
             .task { await refresh() }
         }
+    }
+
+    private var genreFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                genreChip(title: "All", isSelected: settingsStore.preferredGenreIDs.isEmpty) {
+                    guard !settingsStore.preferredGenreIDs.isEmpty else { return }
+                    settingsStore.preferredGenreIDs.removeAll()
+                    Task { await refresh() }
+                }
+                ForEach(genreStore.genres) { genre in
+                    genreChip(title: genre.name, isSelected: settingsStore.preferredGenreIDs.contains(genre.id)) {
+                        toggleGenre(genre.id)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .background(.bar)
+    }
+
+    private func genreChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(isSelected ? .semibold : .regular))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .foregroundStyle(isSelected ? .white : .primary)
+                .background(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleGenre(_ id: Int) {
+        if settingsStore.preferredGenreIDs.contains(id) {
+            settingsStore.preferredGenreIDs.remove(id)
+        } else {
+            settingsStore.preferredGenreIDs.insert(id)
+        }
+        Task { await refresh() }
     }
 
     private func caption(for scored: ScoredMovie) -> String? {
