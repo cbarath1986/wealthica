@@ -13,7 +13,7 @@ final class WatchNextViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
 
     /// Minimum TMDB rating for a candidate to count as a "good" movie.
-    private let qualityThreshold = 7.0
+    private let qualityThreshold = 6.0
 
     private let tmdbClient: TMDBClient
 
