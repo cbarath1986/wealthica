@@ -42,10 +42,15 @@ enum RecommendationEngine {
         strictLanguageFilter: Bool = false,
         preferredGenreIDs: Set<Int> = [],
         strictGenreFilter: Bool = false,
+        additionalExclusions: Set<Int> = [],
         now: Date = .now,
         limit: Int = 30
     ) -> [ScoredMovie] {
-        let excludedIDs = Set(library.map(\.tmdbID))
+        // `library` drives both exclusion and genre affinity. Callers that
+        // want affinity computed from only a subset (e.g. watched-only,
+        // ignoring favorites) can still exclude the rest of the real
+        // library via `additionalExclusions` without it affecting scoring.
+        let excludedIDs = Set(library.map(\.tmdbID)).union(additionalExclusions)
         let affinity = genreAffinity(library: library, now: now)
 
         let scored: [ScoredMovie] = candidates.compactMap { candidate in

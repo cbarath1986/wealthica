@@ -14,6 +14,8 @@ struct RootView: View {
                 TabView {
                     ForYouView(tmdbClient: tmdbClient)
                         .tabItem { Label("For You", systemImage: "sparkles") }
+                    WatchNextView(tmdbClient: tmdbClient)
+                        .tabItem { Label("Watch Next", systemImage: "arrow.right.circle") }
                     DiscoverView(tmdbClient: tmdbClient)
                         .tabItem { Label("Discover", systemImage: "magnifyingglass") }
                     MyMoviesView()

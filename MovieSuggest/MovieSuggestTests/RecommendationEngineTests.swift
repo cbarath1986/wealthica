@@ -118,4 +118,20 @@ final class RecommendationEngineTests: XCTestCase {
         // total = 0.45*1.0 + 0.25*0 + 0.20*1.0 + 0.10*0.7 = 0.72
         XCTAssertEqual(results.first?.total ?? 0, 0.72, accuracy: 0.0001)
     }
+
+    func testAdditionalExclusionsAreExcludedWithoutAffectingAffinity() {
+        // Used by Watch Next: genre affinity comes only from a watched-only
+        // subset of the library, but a favorited-not-watched movie should
+        // still be excluded from suggestions via additionalExclusions.
+        let watchedOnly = [LibraryItem(tmdbID: 1, genreIDs: [28], isFavorite: false, referenceDate: now)]
+        let candidates = [
+            Candidate(movie: movie(id: 2, genreIds: [28], language: "en"), seedHits: 0),
+            Candidate(movie: movie(id: 3, genreIds: [28], language: "en"), seedHits: 0),
+        ]
+        let results = RecommendationEngine.score(
+            candidates: candidates, library: watchedOnly, preferredLanguages: ["en"],
+            additionalExclusions: [3], now: now
+        )
+        XCTAssertEqual(results.map(\.movie.id), [2])
+    }
 }
