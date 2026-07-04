@@ -6,9 +6,11 @@ struct RootView: View {
     @Environment(\.tmdbClient) private var tmdbClient
     @State private var hasKey = APIKeyStore.currentKey() != nil
 
+    private var isUnlocked: Bool { hasKey && settingsStore.hasCompletedOnboarding }
+
     var body: some View {
         Group {
-            if hasKey && settingsStore.hasCompletedOnboarding {
+            if isUnlocked {
                 TabView {
                     ForYouView(tmdbClient: tmdbClient)
                         .tabItem { Label("For You", systemImage: "sparkles") }
@@ -28,6 +30,12 @@ struct RootView: View {
         }
         .task {
             hasKey = APIKeyStore.currentKey() != nil
+        }
+        .task(id: isUnlocked) {
+            // Re-runs whenever the app transitions into the signed-in state
+            // (onboarding just completed, or a removed key was re-added),
+            // not just once before a key exists.
+            guard isUnlocked else { return }
             await genreStore.refresh(using: tmdbClient)
         }
     }
