@@ -47,7 +47,20 @@ final class WatchNextViewModel: ObservableObject {
         Log.recommendation.debug("Watch Next: \(watchedItems.count, privacy: .public) watched movie(s), top genres \(topGenres, privacy: .public)")
 
         let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
-        let movies = await tmdbClient.discoverPages(genreIDs: topGenres, languages: languages, pageCount: 5)
+        var movies = await tmdbClient.discoverPages(genreIDs: topGenres, languages: languages, pageCount: 5)
+
+        // A niche genre+language combination can still be thin even across
+        // several pages — backfill with the same languages but no genre
+        // restriction so the feed isn't starved just because that specific
+        // combination is rare.
+        if movies.count < 40 {
+            let backfill = await tmdbClient.discoverPages(genreIDs: [], languages: languages, pageCount: 3)
+            var seen = Set(movies.map(\.id))
+            for movie in backfill where !seen.contains(movie.id) {
+                movies.append(movie)
+                seen.insert(movie.id)
+            }
+        }
 
         // "Good movies" — filter to a solid rating bar on top of TMDB's own
         // vote-count floor already applied inside discover().

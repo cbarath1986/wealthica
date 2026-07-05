@@ -55,6 +55,16 @@ final class ForYouViewModel: ObservableObject {
                     for movie in discovered where moviesByID[movie.id] == nil {
                         moviesByID[movie.id] = movie
                     }
+                    // A niche genre+language combination can still be thin
+                    // even across several pages — backfill with the same
+                    // languages but no genre restriction so the feed isn't
+                    // starved just because that specific combination is rare.
+                    if moviesByID.count < 40 {
+                        let backfill = await tmdbClient.discoverPages(genreIDs: [], languages: languages, pageCount: 2)
+                        for movie in backfill where moviesByID[movie.id] == nil {
+                            moviesByID[movie.id] = movie
+                        }
+                    }
                 }
                 let candidates = moviesByID.values.map { Candidate(movie: $0, seedHits: 0) }
                 recommendations = RecommendationEngine.score(
@@ -141,6 +151,17 @@ final class ForYouViewModel: ObservableObject {
         let discovered = await tmdbClient.discoverPages(genreIDs: discoverGenres, languages: languages, pageCount: 3)
         for movie in discovered where moviesByID[movie.id] == nil {
             moviesByID[movie.id] = movie
+        }
+
+        // A niche genre+language combination can still be thin even across
+        // several pages and favorite-seeded candidates — backfill with the
+        // same languages but no genre restriction so the feed isn't starved
+        // just because that specific combination is rare.
+        if moviesByID.count < 40 {
+            let backfill = await tmdbClient.discoverPages(genreIDs: [], languages: languages, pageCount: 2)
+            for movie in backfill where moviesByID[movie.id] == nil {
+                moviesByID[movie.id] = movie
+            }
         }
 
         return moviesByID.values.map { Candidate(movie: $0, seedHits: seedHitsByID[$0.id] ?? 0) }

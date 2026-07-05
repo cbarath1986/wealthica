@@ -70,9 +70,14 @@ actor TMDBClient {
     }
 
     func discover(genreIDs: [Int], originalLanguage: String?, page: Int = 1) async throws -> TMDBPagedResponse<TMDBMovie> {
+        // 200 sounds like a low bar but is actually steep for most non-
+        // Hollywood cinema — many well-regarded regional-language films
+        // simply never accumulate that many TMDB user ratings. 30 still
+        // filters out ratingless/junk entries without starving smaller
+        // catalogs of real results.
         var items: [URLQueryItem] = [
             URLQueryItem(name: "sort_by", value: "popularity.desc"),
-            URLQueryItem(name: "vote_count.gte", value: "200"),
+            URLQueryItem(name: "vote_count.gte", value: "30"),
             URLQueryItem(name: "include_adult", value: "false"),
             URLQueryItem(name: "page", value: String(page)),
         ]
