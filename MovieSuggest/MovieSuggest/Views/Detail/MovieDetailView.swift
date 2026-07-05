@@ -13,6 +13,7 @@ struct MovieDetailView: View {
     @State private var details: TMDBMovieDetails?
     @State private var similar: [TMDBMovie] = []
     @State private var loadError: String?
+    @State private var showingMoreLikeThis = false
 
     @Query private var libraryMatches: [Movie]
 
@@ -79,7 +80,13 @@ struct MovieDetailView: View {
 
                     if !similar.isEmpty {
                         VStack(alignment: .leading) {
-                            Text("More like this").font(.headline).padding(.horizontal)
+                            HStack {
+                                Text("More like this").font(.headline)
+                                Spacer()
+                                Button("See All") { showingMoreLikeThis = true }
+                                    .font(.subheadline)
+                            }
+                            .padding(.horizontal)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 12) {
                                     ForEach(similar) { movie in
@@ -104,6 +111,11 @@ struct MovieDetailView: View {
         .navigationTitle(displayMovie?.title ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $showingMoreLikeThis) {
+            if let displayMovie {
+                MoreLikeThisView(sourceMovie: displayMovie, tmdbClient: tmdbClient)
+            }
+        }
     }
 
     @ViewBuilder
