@@ -91,7 +91,7 @@ struct MovieDetailView: View {
                         watchProvidersSection(watchProviderRegion)
                     }
 
-                    if let credits, !credits.cast.isEmpty {
+                    if let credits, !credits.cast.isEmpty || credits.crew.contains(where: { $0.job == "Director" }) {
                         castAndCrewSection(credits)
                     }
 
@@ -235,10 +235,11 @@ struct MovieDetailView: View {
                 .buttonStyle(.plain)
             }
 
-            Text("Cast").font(.headline)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(credits.cast.prefix(15)) { member in
+            if !credits.cast.isEmpty {
+                Text("Cast").font(.headline)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(credits.cast.prefix(15)) { member in
                         Button {
                             selectedPerson = PersonRoute(id: member.id, name: member.name)
                         } label: {
@@ -273,6 +274,7 @@ struct MovieDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
+            }
             }
         }
         .padding(.horizontal)
