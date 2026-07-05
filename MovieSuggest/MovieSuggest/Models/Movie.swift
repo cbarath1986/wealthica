@@ -16,8 +16,10 @@ final class Movie {
     var voteAverage: Double
     var isWatched: Bool
     var isFavorite: Bool
+    var isWatchlisted: Bool = false
     var watchedAt: Date?
     var favoritedAt: Date?
+    var watchlistedAt: Date?
     var addedAt: Date
 
     init(dto: TMDBMovie) {
@@ -31,6 +33,7 @@ final class Movie {
         voteAverage = dto.voteAverage ?? 0
         isWatched = false
         isFavorite = false
+        isWatchlisted = false
         addedAt = .now
     }
 
@@ -59,11 +62,21 @@ final class Movie {
     func toggleWatched() {
         isWatched.toggle()
         watchedAt = isWatched ? .now : nil
+        // Once watched, there's nothing left to "watch later" for.
+        if isWatched && isWatchlisted {
+            isWatchlisted = false
+            watchlistedAt = nil
+        }
     }
 
     func toggleFavorite() {
         isFavorite.toggle()
         favoritedAt = isFavorite ? .now : nil
+    }
+
+    func toggleWatchlisted() {
+        isWatchlisted.toggle()
+        watchlistedAt = isWatchlisted ? .now : nil
     }
 
     static let releaseDateFormatter: DateFormatter = {
@@ -93,11 +106,11 @@ extension ModelContext {
             insert(movie)
         }
         change(movie)
-        if !movie.isWatched && !movie.isFavorite {
+        if !movie.isWatched && !movie.isFavorite && !movie.isWatchlisted {
             Log.library.info("removed \"\(movie.title, privacy: .public)\" (tmdbID \(movie.tmdbID, privacy: .public)) from library")
             delete(movie)
         } else {
-            Log.library.info("\"\(movie.title, privacy: .public)\" (tmdbID \(movie.tmdbID, privacy: .public)): watched=\(movie.isWatched, privacy: .public) favorite=\(movie.isFavorite, privacy: .public)")
+            Log.library.info("\"\(movie.title, privacy: .public)\" (tmdbID \(movie.tmdbID, privacy: .public)): watched=\(movie.isWatched, privacy: .public) favorite=\(movie.isFavorite, privacy: .public) watchlisted=\(movie.isWatchlisted, privacy: .public)")
         }
     }
 }

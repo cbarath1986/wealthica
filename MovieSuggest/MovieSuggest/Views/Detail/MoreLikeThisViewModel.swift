@@ -17,7 +17,7 @@ final class MoreLikeThisViewModel: ObservableObject {
         self.tmdbClient = tmdbClient
     }
 
-    func load(sourceMovie: TMDBMovie, libraryIDs: Set<Int>, preferredLanguages: Set<String>) async {
+    func load(sourceMovie: TMDBMovie, libraryIDs: Set<Int>, preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -63,7 +63,7 @@ final class MoreLikeThisViewModel: ObservableObject {
             library: [],
             preferredLanguages: preferredLanguages,
             preferredGenreIDs: Set(genreIDs),
-            additionalExclusions: libraryIDs.union([sourceMovie.id]),
+            additionalExclusions: libraryIDs.union(dismissedMovieIDs).union([sourceMovie.id]),
             limit: 50
         )
         Log.recommendation.info("More Like This (\(sourceMovie.id, privacy: .public)): \(candidates.count, privacy: .public) candidates -> \(self.results.count, privacy: .public) results")

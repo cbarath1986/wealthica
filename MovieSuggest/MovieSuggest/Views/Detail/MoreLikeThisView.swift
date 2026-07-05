@@ -34,7 +34,17 @@ struct MoreLikeThisView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(viewModel.results) { scored in
                             NavigationLink(value: scored.movie.id) {
-                                MoviePosterCard(movie: scored.movie)
+                                MoviePosterCard(movie: scored.movie, onNotInterested: {
+                                    settingsStore.dismiss(scored.movie.id)
+                                    Task {
+                                        await viewModel.load(
+                                            sourceMovie: sourceMovie,
+                                            libraryIDs: Set(library.map(\.tmdbID)),
+                                            preferredLanguages: settingsStore.preferredLanguages,
+                                            dismissedMovieIDs: settingsStore.dismissedMovieIDs
+                                        )
+                                    }
+                                })
                             }
                             .buttonStyle(.plain)
                         }
@@ -56,7 +66,8 @@ struct MoreLikeThisView: View {
                 await viewModel.load(
                     sourceMovie: sourceMovie,
                     libraryIDs: Set(library.map(\.tmdbID)),
-                    preferredLanguages: settingsStore.preferredLanguages
+                    preferredLanguages: settingsStore.preferredLanguages,
+                    dismissedMovieIDs: settingsStore.dismissedMovieIDs
                 )
             }
         }

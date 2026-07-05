@@ -4,6 +4,9 @@ import SwiftUI
 struct MoviePosterCard: View {
     let movie: TMDBMovie
     var caption: String?
+    /// Nil hides the "Not Interested" context menu entirely (e.g. when
+    /// there's no sensible place to persist a dismissal).
+    var onNotInterested: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -44,6 +47,13 @@ struct MoviePosterCard: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
+            }
+        }
+        .contextMenu {
+            if let onNotInterested {
+                Button(role: .destructive, action: onNotInterested) {
+                    Label("Not Interested", systemImage: "hand.thumbsdown")
+                }
             }
         }
     }

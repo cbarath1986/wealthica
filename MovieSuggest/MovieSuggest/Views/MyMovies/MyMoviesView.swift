@@ -5,6 +5,7 @@ struct MyMoviesView: View {
     private enum Segment: String, CaseIterable {
         case watched = "Watched"
         case favorites = "Favorites"
+        case watchlist = "Watchlist"
     }
 
     @Query(sort: \Movie.addedAt, order: .reverse) private var allMovies: [Movie]
@@ -12,7 +13,27 @@ struct MyMoviesView: View {
     @State private var segment: Segment = .watched
 
     private var filtered: [Movie] {
-        allMovies.filter { segment == .watched ? $0.isWatched : $0.isFavorite }
+        switch segment {
+        case .watched: return allMovies.filter(\.isWatched)
+        case .favorites: return allMovies.filter(\.isFavorite)
+        case .watchlist: return allMovies.filter(\.isWatchlisted)
+        }
+    }
+
+    private var emptyStateTitle: String {
+        switch segment {
+        case .watched: return "No watched movies yet"
+        case .favorites: return "No favorites yet"
+        case .watchlist: return "Nothing saved for later yet"
+        }
+    }
+
+    private var emptyStateIcon: String {
+        switch segment {
+        case .watched: return "eye"
+        case .favorites: return "heart"
+        case .watchlist: return "bookmark"
+        }
     }
 
     var body: some View {
@@ -20,15 +41,20 @@ struct MyMoviesView: View {
             Group {
                 if filtered.isEmpty {
                     ContentUnavailableView(
-                        segment == .watched ? "No watched movies yet" : "No favorites yet",
-                        systemImage: segment == .watched ? "eye" : "heart",
+                        emptyStateTitle,
+                        systemImage: emptyStateIcon,
                         description: Text("Movies you mark from a detail screen show up here.")
                     )
                 } else {
                     List {
                         ForEach(filtered) { movie in
                             NavigationLink(value: movie.tmdbID) {
-                                MovieRow(movie: movie.asDTO, isWatched: movie.isWatched, isFavorite: movie.isFavorite)
+                                MovieRow(
+                                    movie: movie.asDTO,
+                                    isWatched: movie.isWatched,
+                                    isFavorite: movie.isFavorite,
+                                    isWatchlisted: movie.isWatchlisted
+                                )
                             }
                         }
                         .onDelete(perform: remove)

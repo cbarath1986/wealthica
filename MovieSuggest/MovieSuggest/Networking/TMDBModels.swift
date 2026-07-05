@@ -75,3 +75,55 @@ struct TMDBGenre: Decodable, Identifiable, Hashable {
 struct TMDBGenreListResponse: Decodable {
     let genres: [TMDBGenre]
 }
+
+// MARK: - Credits
+
+struct TMDBCredits: Decodable {
+    let cast: [TMDBCastMember]
+    let crew: [TMDBCrewMember]
+}
+
+struct TMDBCastMember: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let character: String?
+    let profilePath: String?
+}
+
+struct TMDBCrewMember: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let job: String?
+    let department: String?
+    let profilePath: String?
+}
+
+/// A person's filmography from `/person/{id}/movie_credits`. Each cast/crew
+/// entry there is shaped like a regular movie (plus role fields we don't
+/// need), so it decodes directly as `TMDBMovie` — Codable simply ignores
+/// the extra `character`/`job`/`credit_id` keys.
+struct TMDBPersonMovieCredits: Decodable {
+    let cast: [TMDBMovie]
+    let crew: [TMDBMovie]
+}
+
+// MARK: - Watch providers
+
+struct TMDBWatchProvidersResponse: Decodable {
+    let results: [String: TMDBWatchProviderRegion]
+}
+
+struct TMDBWatchProviderRegion: Decodable {
+    let link: String?
+    let flatrate: [TMDBWatchProvider]?
+    let rent: [TMDBWatchProvider]?
+    let buy: [TMDBWatchProvider]?
+}
+
+struct TMDBWatchProvider: Decodable, Identifiable, Hashable {
+    let providerId: Int
+    let providerName: String
+    let logoPath: String?
+
+    var id: Int { providerId }
+}

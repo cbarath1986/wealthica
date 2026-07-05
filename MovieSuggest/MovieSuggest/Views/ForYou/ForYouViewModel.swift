@@ -5,6 +5,7 @@ import Combine
 @MainActor
 final class ForYouViewModel: ObservableObject {
     @Published private(set) var recommendations: [ScoredMovie] = []
+    @Published private(set) var newReleases: [TMDBMovie] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var isColdStart = false
@@ -20,27 +21,45 @@ final class ForYouViewModel: ObservableObject {
         preferredLanguages: Set<String>,
         strictLanguageFilter: Bool,
         preferredGenreIDs: Set<Int>,
-        strictGenreFilter: Bool
+        strictGenreFilter: Bool,
+        dismissedMovieIDs: Set<Int>
     ) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        let libraryItems = library.map {
-            LibraryItem(
-                tmdbID: $0.tmdbID,
-                genreIDs: $0.genreIDs,
-                isFavorite: $0.isFavorite,
-                referenceDate: $0.favoritedAt ?? $0.watchedAt ?? $0.addedAt
-            )
-        }
+        // Only movies actually watched or favorited count as taste signal.
+        // A watchlist-only entry (saved for later, never watched) shouldn't
+        // contribute to genre affinity or suppress the cold-start feed —
+        // but it (and anything dismissed via "Not Interested") should still
+        // never be re-suggested, so it's folded into `baseExclusions` below.
+        let tasteItems = library
+            .filter { $0.isWatched || $0.isFavorite }
+            .map {
+                LibraryItem(
+                    tmdbID: $0.tmdbID,
+                    genreIDs: $0.genreIDs,
+                    isFavorite: $0.isFavorite,
+                    referenceDate: $0.favoritedAt ?? $0.watchedAt ?? $0.addedAt
+                )
+            }
+        let baseExclusions = Set(library.map(\.tmdbID)).union(dismissedMovieIDs)
 
-        Log.recommendation.debug("refresh: library=\(library.count, privacy: .public) genres=\(preferredGenreIDs.count, privacy: .public) langs=\(preferredLanguages.count, privacy: .public)")
+        Log.recommendation.debug("refresh: library=\(library.count, privacy: .public) taste=\(tasteItems.count, privacy: .public) genres=\(preferredGenreIDs.count, privacy: .public) langs=\(preferredLanguages.count, privacy: .public)")
+
+        let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
+        let releases = await tmdbClient.newReleasesPages(languages: languages, pageCount: 2)
+        newReleases = Array(
+            releases
+                .filter { !baseExclusions.contains($0.id) }
+                .sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
+                .prefix(15)
+        )
 
         do {
-            if libraryItems.isEmpty {
+            if tasteItems.isEmpty {
                 isColdStart = true
-                Log.recommendation.info("cold start: empty library, using trending + preferred genres")
+                Log.recommendation.info("cold start: no watched/favorited movies yet, using trending + preferred genres")
                 var moviesByID: [Int: TMDBMovie] = [:]
                 if let trending = try? await tmdbClient.trending() {
                     for movie in trending.results { moviesByID[movie.id] = movie }
@@ -50,7 +69,6 @@ final class ForYouViewModel: ObservableObject {
                 // available to shape the cold-start feed beyond trending.
                 if !preferredGenreIDs.isEmpty {
                     let genreIDs = Array(preferredGenreIDs)
-                    let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
                     let discovered = await tmdbClient.discoverPages(genreIDs: genreIDs, languages: languages, pageCount: 3)
                     for movie in discovered where moviesByID[movie.id] == nil {
                         moviesByID[movie.id] = movie
@@ -74,6 +92,7 @@ final class ForYouViewModel: ObservableObject {
                     strictLanguageFilter: false,
                     preferredGenreIDs: preferredGenreIDs,
                     strictGenreFilter: strictGenreFilter,
+                    additionalExclusions: baseExclusions,
                     limit: 40
                 )
                 Log.recommendation.info("cold start: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")
@@ -83,17 +102,18 @@ final class ForYouViewModel: ObservableObject {
             isColdStart = false
             let candidates = try await gatherCandidates(
                 library: library,
-                libraryItems: libraryItems,
+                libraryItems: tasteItems,
                 preferredLanguages: preferredLanguages,
                 preferredGenreIDs: preferredGenreIDs
             )
             recommendations = RecommendationEngine.score(
                 candidates: candidates,
-                library: libraryItems,
+                library: tasteItems,
                 preferredLanguages: preferredLanguages,
                 strictLanguageFilter: strictLanguageFilter,
                 preferredGenreIDs: preferredGenreIDs,
                 strictGenreFilter: strictGenreFilter,
+                additionalExclusions: baseExclusions,
                 limit: 40
             )
             Log.recommendation.info("personalized: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")

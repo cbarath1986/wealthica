@@ -32,7 +32,9 @@ struct WatchNextView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(viewModel.suggestions) { scored in
                             NavigationLink(value: scored.movie.id) {
-                                MoviePosterCard(movie: scored.movie, caption: caption(for: scored))
+                                MoviePosterCard(movie: scored.movie, caption: caption(for: scored), onNotInterested: {
+                                    dismiss(scored.movie.id)
+                                })
                             }
                             .buttonStyle(.plain)
                         }
@@ -54,7 +56,16 @@ struct WatchNextView: View {
         return "Because you watched \(name.lowercased())"
     }
 
+    private func dismiss(_ movieID: Int) {
+        settingsStore.dismiss(movieID)
+        Task { await refresh() }
+    }
+
     private func refresh() async {
-        await viewModel.refresh(library: library, preferredLanguages: settingsStore.preferredLanguages)
+        await viewModel.refresh(
+            library: library,
+            preferredLanguages: settingsStore.preferredLanguages,
+            dismissedMovieIDs: settingsStore.dismissedMovieIDs
+        )
     }
 }

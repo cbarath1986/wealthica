@@ -21,7 +21,7 @@ final class WatchNextViewModel: ObservableObject {
         self.tmdbClient = tmdbClient
     }
 
-    func refresh(library: [Movie], preferredLanguages: Set<String>) async {
+    func refresh(library: [Movie], preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -69,8 +69,9 @@ final class WatchNextViewModel: ObservableObject {
             .map { Candidate(movie: $0, seedHits: 0) }
 
         // Exclude everything already in the library, not just the
-        // watched-only subset used to derive genre affinity, so a
-        // favorited-but-not-yet-watched movie isn't suggested again.
+        // watched-only subset used to derive genre affinity (so a
+        // favorited-but-not-yet-watched or watchlisted movie isn't
+        // suggested again), plus anything dismissed via "Not Interested".
         let watchedIDs = Set(watchedItems.map(\.tmdbID))
         let restOfLibraryIDs = Set(library.map(\.tmdbID)).subtracting(watchedIDs)
 
@@ -78,7 +79,7 @@ final class WatchNextViewModel: ObservableObject {
             candidates: candidates,
             library: watchedItems,
             preferredLanguages: preferredLanguages,
-            additionalExclusions: restOfLibraryIDs,
+            additionalExclusions: restOfLibraryIDs.union(dismissedMovieIDs),
             limit: 50
         )
         Log.recommendation.info("Watch Next: \(candidates.count, privacy: .public) candidates -> \(self.suggestions.count, privacy: .public) suggestions")

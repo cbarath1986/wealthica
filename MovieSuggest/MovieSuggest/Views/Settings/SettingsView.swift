@@ -66,6 +66,18 @@ struct SettingsView: View {
                     Toggle("Only Preferred Genres", isOn: $settingsStore.strictGenreFilter)
                 }
 
+                Section("Not Interested") {
+                    NavigationLink {
+                        HiddenMoviesView()
+                    } label: {
+                        HStack {
+                            Text("Hidden Movies")
+                            Spacer()
+                            Text("\(settingsStore.dismissedMovieIDs.count)").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: "1.0")
                     Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")

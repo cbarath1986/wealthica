@@ -24,6 +24,10 @@ struct ForYouView: View {
                         .padding()
                 }
 
+                if !viewModel.newReleases.isEmpty {
+                    newReleasesRail
+                }
+
                 if let errorMessage = viewModel.errorMessage {
                     ContentUnavailableView("Couldn't load recommendations", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
                         .padding(.top, 60)
@@ -33,7 +37,9 @@ struct ForYouView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(viewModel.recommendations) { scored in
                             NavigationLink(value: scored.movie.id) {
-                                MoviePosterCard(movie: scored.movie, caption: caption(for: scored))
+                                MoviePosterCard(movie: scored.movie, caption: caption(for: scored), onNotInterested: {
+                                    dismiss(scored.movie.id)
+                                })
                             }
                             .buttonStyle(.plain)
                         }
@@ -51,6 +57,25 @@ struct ForYouView: View {
             .refreshable { await refresh() }
             .task { await refresh() }
         }
+    }
+
+    private var newReleasesRail: some View {
+        VStack(alignment: .leading) {
+            Text("New Releases").font(.headline).padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(viewModel.newReleases) { movie in
+                        NavigationLink(value: movie.id) {
+                            MoviePosterCard(movie: movie, onNotInterested: { dismiss(movie.id) })
+                                .frame(width: 120)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     private var genreFilterBar: some View {
@@ -101,13 +126,19 @@ struct ForYouView: View {
         return scored.fromSeed ? "Similar to your favorites" : nil
     }
 
+    private func dismiss(_ movieID: Int) {
+        settingsStore.dismiss(movieID)
+        Task { await refresh() }
+    }
+
     private func refresh() async {
         await viewModel.refresh(
             library: library,
             preferredLanguages: settingsStore.preferredLanguages,
             strictLanguageFilter: settingsStore.strictLanguageFilter,
             preferredGenreIDs: settingsStore.preferredGenreIDs,
-            strictGenreFilter: settingsStore.strictGenreFilter
+            strictGenreFilter: settingsStore.strictGenreFilter,
+            dismissedMovieIDs: settingsStore.dismissedMovieIDs
         )
     }
 }

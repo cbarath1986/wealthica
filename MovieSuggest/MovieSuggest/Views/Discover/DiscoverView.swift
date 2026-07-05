@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DiscoverView: View {
+    @EnvironmentObject private var settingsStore: SettingsStore
     @StateObject private var viewModel: DiscoverViewModel
 
     private let columns = [GridItem(.adaptive(minimum: 110), spacing: 12)]
@@ -19,7 +20,10 @@ struct DiscoverView: View {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(viewModel.results) { movie in
                             NavigationLink(value: movie.id) {
-                                MoviePosterCard(movie: movie)
+                                MoviePosterCard(movie: movie, onNotInterested: {
+                                    settingsStore.dismiss(movie.id)
+                                    viewModel.queryChanged(dismissedMovieIDs: settingsStore.dismissedMovieIDs)
+                                })
                             }
                             .buttonStyle(.plain)
                         }
@@ -32,11 +36,13 @@ struct DiscoverView: View {
             }
             .navigationTitle("Discover")
             .searchable(text: $viewModel.query, prompt: "Search movies")
-            .onChange(of: viewModel.query) { _, _ in viewModel.queryChanged() }
+            .onChange(of: viewModel.query) { _, _ in
+                viewModel.queryChanged(dismissedMovieIDs: settingsStore.dismissedMovieIDs)
+            }
             .navigationDestination(for: Int.self) { movieID in
                 MovieDetailView(movieID: movieID)
             }
-            .task { await viewModel.loadTrendingIfNeeded() }
+            .task { await viewModel.loadTrendingIfNeeded(dismissedMovieIDs: settingsStore.dismissedMovieIDs) }
         }
     }
 }

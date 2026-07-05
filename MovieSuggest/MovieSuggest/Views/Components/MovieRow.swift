@@ -5,6 +5,7 @@ struct MovieRow: View {
     let movie: TMDBMovie
     var isWatched = false
     var isFavorite = false
+    var isWatchlisted = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -38,6 +39,9 @@ struct MovieRow: View {
                 }
                 if isWatched {
                     Image(systemName: "eye.fill").foregroundStyle(.secondary)
+                }
+                if isWatchlisted {
+                    Image(systemName: "bookmark.fill").foregroundStyle(.accentColor)
                 }
             }
             .font(.caption)
