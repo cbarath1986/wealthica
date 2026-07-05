@@ -43,27 +43,15 @@ final class WatchNextViewModel: ObservableObject {
             return
         }
 
-        let topGenres = RecommendationEngine.topGenres(library: watchedItems, count: 4)
+        let topGenres = RecommendationEngine.topGenres(library: watchedItems, count: 5)
         Log.recommendation.debug("Watch Next: \(watchedItems.count, privacy: .public) watched movie(s), top genres \(topGenres, privacy: .public)")
 
-        var moviesByID: [Int: TMDBMovie] = [:]
         let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
-        await withTaskGroup(of: [TMDBMovie].self) { group in
-            for language in languages {
-                group.addTask { [tmdbClient] in
-                    (try? await tmdbClient.discover(genreIDs: topGenres, originalLanguage: language))?.results ?? []
-                }
-            }
-            for await movies in group {
-                for movie in movies where moviesByID[movie.id] == nil {
-                    moviesByID[movie.id] = movie
-                }
-            }
-        }
+        let movies = await tmdbClient.discoverPages(genreIDs: topGenres, languages: languages, pageCount: 5)
 
         // "Good movies" — filter to a solid rating bar on top of TMDB's own
         // vote-count floor already applied inside discover().
-        let candidates = moviesByID.values
+        let candidates = movies
             .filter { ($0.voteAverage ?? 0) >= qualityThreshold }
             .map { Candidate(movie: $0, seedHits: 0) }
 
@@ -78,7 +66,7 @@ final class WatchNextViewModel: ObservableObject {
             library: watchedItems,
             preferredLanguages: preferredLanguages,
             additionalExclusions: restOfLibraryIDs,
-            limit: 24
+            limit: 50
         )
         Log.recommendation.info("Watch Next: \(candidates.count, privacy: .public) candidates -> \(self.suggestions.count, privacy: .public) suggestions")
     }

@@ -86,6 +86,31 @@ actor TMDBClient {
         return try await request("/discover/movie", query: items)
     }
 
+    /// Fans out `discover` across every language and page combination
+    /// (concurrently), deduplicated by id. A single `discover` call only
+    /// returns TMDB's first ~20 results for that language, so pulling
+    /// several pages is what keeps the candidate pool large enough to
+    /// survive quality and library-exclusion filtering downstream instead
+    /// of collapsing to a handful of results.
+    func discoverPages(genreIDs: [Int], languages: [String?], pageCount: Int) async -> [TMDBMovie] {
+        var moviesByID: [Int: TMDBMovie] = [:]
+        await withTaskGroup(of: [TMDBMovie].self) { group in
+            for language in languages {
+                for page in 1...max(1, pageCount) {
+                    group.addTask { [self] in
+                        (try? await self.discover(genreIDs: genreIDs, originalLanguage: language, page: page))?.results ?? []
+                    }
+                }
+            }
+            for await movies in group {
+                for movie in movies where moviesByID[movie.id] == nil {
+                    moviesByID[movie.id] = movie
+                }
+            }
+        }
+        return Array(moviesByID.values)
+    }
+
     func movieDetails(id: Int) async throws -> TMDBMovieDetails {
         try await request("/movie/\(id)")
     }

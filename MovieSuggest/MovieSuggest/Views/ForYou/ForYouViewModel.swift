@@ -51,17 +51,9 @@ final class ForYouViewModel: ObservableObject {
                 if !preferredGenreIDs.isEmpty {
                     let genreIDs = Array(preferredGenreIDs)
                     let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
-                    await withTaskGroup(of: [TMDBMovie].self) { group in
-                        for language in languages {
-                            group.addTask { [tmdbClient] in
-                                (try? await tmdbClient.discover(genreIDs: genreIDs, originalLanguage: language))?.results ?? []
-                            }
-                        }
-                        for await movies in group {
-                            for movie in movies where moviesByID[movie.id] == nil {
-                                moviesByID[movie.id] = movie
-                            }
-                        }
+                    let discovered = await tmdbClient.discoverPages(genreIDs: genreIDs, languages: languages, pageCount: 3)
+                    for movie in discovered where moviesByID[movie.id] == nil {
+                        moviesByID[movie.id] = movie
                     }
                 }
                 let candidates = moviesByID.values.map { Candidate(movie: $0, seedHits: 0) }
@@ -72,7 +64,7 @@ final class ForYouViewModel: ObservableObject {
                     strictLanguageFilter: false,
                     preferredGenreIDs: preferredGenreIDs,
                     strictGenreFilter: strictGenreFilter,
-                    limit: 30
+                    limit: 40
                 )
                 Log.recommendation.info("cold start: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")
                 return
@@ -92,7 +84,7 @@ final class ForYouViewModel: ObservableObject {
                 strictLanguageFilter: strictLanguageFilter,
                 preferredGenreIDs: preferredGenreIDs,
                 strictGenreFilter: strictGenreFilter,
-                limit: 30
+                limit: 40
             )
             Log.recommendation.info("personalized: \(candidates.count, privacy: .public) candidates -> \(self.recommendations.count, privacy: .public) recommendations")
         } catch let error as TMDBError {
@@ -144,19 +136,11 @@ final class ForYouViewModel: ObservableObject {
 
         // Combine genres inferred from watch history with any explicit
         // preference so the discover query reflects both signals.
-        let discoverGenres = Array(Set(RecommendationEngine.topGenres(library: libraryItems)).union(preferredGenreIDs))
+        let discoverGenres = Array(Set(RecommendationEngine.topGenres(library: libraryItems, count: 4)).union(preferredGenreIDs))
         let languages = preferredLanguages.isEmpty ? [nil as String?] : preferredLanguages.map { $0 }
-        await withTaskGroup(of: [TMDBMovie].self) { group in
-            for language in languages {
-                group.addTask { [tmdbClient] in
-                    (try? await tmdbClient.discover(genreIDs: discoverGenres, originalLanguage: language))?.results ?? []
-                }
-            }
-            for await movies in group {
-                for movie in movies where moviesByID[movie.id] == nil {
-                    moviesByID[movie.id] = movie
-                }
-            }
+        let discovered = await tmdbClient.discoverPages(genreIDs: discoverGenres, languages: languages, pageCount: 3)
+        for movie in discovered where moviesByID[movie.id] == nil {
+            moviesByID[movie.id] = movie
         }
 
         return moviesByID.values.map { Candidate(movie: $0, seedHits: seedHitsByID[$0.id] ?? 0) }
