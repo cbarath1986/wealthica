@@ -34,6 +34,8 @@ enum AIMoodAvailability: Equatable {
                 return .unavailable(reason: "Apple Intelligence's model is still downloading. Try again shortly.")
             case .unavailable:
                 return .unavailable(reason: "Apple Intelligence isn't available right now.")
+            @unknown default:
+                return .unavailable(reason: "Apple Intelligence isn't available right now.")
             }
         } else {
             return .unavailable(reason: "Requires iOS 26 or later.")

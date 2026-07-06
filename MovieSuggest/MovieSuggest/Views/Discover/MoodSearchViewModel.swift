@@ -19,6 +19,10 @@ final class MoodSearchViewModel: ObservableObject {
 
     private let tmdbClient: TMDBClient
     private let resolver: MoodKeywordResolver
+    /// Cancelled and replaced on every new mood/AI search so a slow, stale
+    /// request (e.g. mood A's network round-trip finishing after mood B's)
+    /// can never overwrite fresher results.
+    private var searchTask: Task<Void, Never>?
 
     init(tmdbClient: TMDBClient) {
         self.tmdbClient = tmdbClient
@@ -27,17 +31,30 @@ final class MoodSearchViewModel: ObservableObject {
 
     var isActive: Bool { selectedMood != nil || aiQueryText != nil }
 
-    func select(_ mood: MoodTag, preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) async {
+    func select(_ mood: MoodTag, preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) {
+        searchTask?.cancel()
         selectedMood = mood
         aiQueryText = nil
-        await runSearch(keywordNames: mood.keywordNames, genreIDs: [], preferredLanguages: preferredLanguages, dismissedMovieIDs: dismissedMovieIDs)
+        searchTask = Task {
+            await runSearch(keywordNames: mood.keywordNames, genreIDs: [], preferredLanguages: preferredLanguages, dismissedMovieIDs: dismissedMovieIDs)
+        }
     }
 
     func clear() {
+        searchTask?.cancel()
+        searchTask = nil
         selectedMood = nil
         aiQueryText = nil
         results = []
         errorMessage = nil
+    }
+
+    /// Removes a just-dismissed ("Not Interested") movie from the visible
+    /// results immediately, regardless of whether they came from a mood
+    /// chip or an AI free-text search — no re-fetch needed, and it can't
+    /// race with `searchTask`.
+    func removeDismissed(_ movieID: Int) {
+        results.removeAll { $0.id == movieID }
     }
 
     #if canImport(FoundationModels)
@@ -47,22 +64,27 @@ final class MoodSearchViewModel: ObservableObject {
     /// doesn't re-check either, since it's only ever wired to UI that's
     /// hidden without both.
     @available(iOS 26.0, *)
-    func searchFreeText(_ text: String, genreStore: GenreStore, preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) async {
+    func searchFreeText(_ text: String, genreStore: GenreStore, preferredLanguages: Set<String>, dismissedMovieIDs: Set<Int>) {
+        searchTask?.cancel()
         selectedMood = nil
         aiQueryText = text
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do {
-            let parsed = try await AIMoodQueryService().parseMood(text)
-            let genreIDs = genreStore.genres
-                .filter { genre in parsed.genreNames.contains { $0.caseInsensitiveCompare(genre.name) == .orderedSame } }
-                .map(\.id)
-            await runSearch(keywordNames: parsed.keywords, genreIDs: genreIDs, preferredLanguages: preferredLanguages, dismissedMovieIDs: dismissedMovieIDs)
-        } catch {
-            results = []
-            errorMessage = "Couldn't understand that mood. Try rephrasing, or pick a mood tag below."
-            Log.network.error("AI mood search failed: \(error.localizedDescription, privacy: .public)")
+        searchTask = Task {
+            isLoading = true
+            errorMessage = nil
+            do {
+                let parsed = try await AIMoodQueryService().parseMood(text)
+                guard !Task.isCancelled else { return }
+                let genreIDs = genreStore.genres
+                    .filter { genre in parsed.genreNames.contains { $0.caseInsensitiveCompare(genre.name) == .orderedSame } }
+                    .map(\.id)
+                await runSearch(keywordNames: parsed.keywords, genreIDs: genreIDs, preferredLanguages: preferredLanguages, dismissedMovieIDs: dismissedMovieIDs)
+            } catch {
+                guard !Task.isCancelled else { return }
+                isLoading = false
+                results = []
+                errorMessage = "Couldn't understand that mood. Try rephrasing, or pick a mood tag below."
+                Log.network.error("AI mood search failed: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
     #endif
@@ -72,6 +94,7 @@ final class MoodSearchViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         let keywordIDs = await resolver.resolveIDs(for: keywordNames)
+        guard !Task.isCancelled else { return }
         guard !keywordIDs.isEmpty || !genreIDs.isEmpty else {
             results = []
             errorMessage = "Couldn't find movies for that mood right now."
@@ -80,6 +103,7 @@ final class MoodSearchViewModel: ObservableObject {
         }
         let languages: [String?] = preferredLanguages.isEmpty ? [nil] : Array(preferredLanguages)
         let movies = await tmdbClient.discoverPages(genreIDs: genreIDs, languages: languages, pageCount: 1, keywordIDs: keywordIDs)
+        guard !Task.isCancelled else { return }
         results = movies
             .filter { !dismissedMovieIDs.contains($0.id) }
             .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }

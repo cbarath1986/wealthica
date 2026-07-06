@@ -61,12 +61,10 @@ struct DiscoverView: View {
     private func moodChip(_ mood: MoodTag) -> some View {
         let isSelected = moodViewModel.selectedMood == mood
         return Button {
-            Task {
-                if isSelected {
-                    moodViewModel.clear()
-                } else {
-                    await moodViewModel.select(mood, preferredLanguages: settingsStore.preferredLanguages, dismissedMovieIDs: settingsStore.dismissedMovieIDs)
-                }
+            if isSelected {
+                moodViewModel.clear()
+            } else {
+                moodViewModel.select(mood, preferredLanguages: settingsStore.preferredLanguages, dismissedMovieIDs: settingsStore.dismissedMovieIDs)
             }
         } label: {
             Label(mood.title, systemImage: mood.icon)
@@ -93,7 +91,7 @@ struct DiscoverView: View {
                 } label: {
                     Image(systemName: "sparkles")
                 }
-                .disabled(aiMoodText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(aiMoodText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || moodViewModel.isLoading)
             }
             .padding(.horizontal)
         }
@@ -105,14 +103,12 @@ struct DiscoverView: View {
         guard #available(iOS 26.0, *) else { return }
         let text = aiMoodText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        Task {
-            await moodViewModel.searchFreeText(
-                text,
-                genreStore: genreStore,
-                preferredLanguages: settingsStore.preferredLanguages,
-                dismissedMovieIDs: settingsStore.dismissedMovieIDs
-            )
-        }
+        moodViewModel.searchFreeText(
+            text,
+            genreStore: genreStore,
+            preferredLanguages: settingsStore.preferredLanguages,
+            dismissedMovieIDs: settingsStore.dismissedMovieIDs
+        )
         #endif
     }
 
@@ -134,11 +130,7 @@ struct DiscoverView: View {
                         NavigationLink(value: movie.id) {
                             MoviePosterCard(movie: movie, onNotInterested: {
                                 settingsStore.dismiss(movie.id)
-                                Task {
-                                    if let mood = moodViewModel.selectedMood {
-                                        await moodViewModel.select(mood, preferredLanguages: settingsStore.preferredLanguages, dismissedMovieIDs: settingsStore.dismissedMovieIDs)
-                                    }
-                                }
+                                moodViewModel.removeDismissed(movie.id)
                             })
                         }
                         .buttonStyle(.plain)
