@@ -28,6 +28,10 @@ struct ForYouView: View {
                     newReleasesRail
                 }
 
+                if !viewModel.comingSoon.isEmpty {
+                    comingSoonRail
+                }
+
                 if let errorMessage = viewModel.errorMessage {
                     ContentUnavailableView("Couldn't load recommendations", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
                         .padding(.top, 60)
@@ -65,6 +69,25 @@ struct ForYouView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(viewModel.newReleases) { movie in
+                        NavigationLink(value: movie.id) {
+                            MoviePosterCard(movie: movie, onNotInterested: { dismiss(movie.id) })
+                                .frame(width: 120)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var comingSoonRail: some View {
+        VStack(alignment: .leading) {
+            Text("Coming Soon").font(.headline).padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(viewModel.comingSoon) { movie in
                         NavigationLink(value: movie.id) {
                             MoviePosterCard(movie: movie, onNotInterested: { dismiss(movie.id) })
                                 .frame(width: 120)

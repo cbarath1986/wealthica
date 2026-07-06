@@ -6,6 +6,7 @@ import Combine
 final class ForYouViewModel: ObservableObject {
     @Published private(set) var recommendations: [ScoredMovie] = []
     @Published private(set) var newReleases: [TMDBMovie] = []
+    @Published private(set) var comingSoon: [TMDBMovie] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var isColdStart = false
@@ -53,6 +54,14 @@ final class ForYouViewModel: ObservableObject {
             releases
                 .filter { !baseExclusions.contains($0.id) }
                 .sorted { ($0.releaseDate ?? "") > ($1.releaseDate ?? "") }
+                .prefix(15)
+        )
+
+        let upcoming = await tmdbClient.comingSoonPages(languages: languages, pageCount: 2)
+        comingSoon = Array(
+            upcoming
+                .filter { !baseExclusions.contains($0.id) }
+                .sorted { ($0.releaseDate ?? "9999-99-99") < ($1.releaseDate ?? "9999-99-99") }
                 .prefix(15)
         )
 

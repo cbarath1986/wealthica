@@ -1,7 +1,10 @@
 import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.tmdbClient) private var tmdbClient
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var settingsStore: SettingsStore
     @EnvironmentObject private var genreStore: GenreStore
 
@@ -9,6 +12,10 @@ struct SettingsView: View {
     @State private var isEditingKey = false
     @State private var isValidating = false
     @State private var validationError: String?
+
+    @State private var exportURL: URL?
+    @State private var isImporting = false
+    @State private var backupAlertMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -78,6 +85,26 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    if let exportURL {
+                        ShareLink(item: exportURL) {
+                            Label("Export Library", systemImage: "square.and.arrow.up")
+                        }
+                    } else {
+                        Label("Preparing export…", systemImage: "square.and.arrow.up")
+                            .foregroundStyle(.secondary)
+                    }
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("Import Library", systemImage: "square.and.arrow.down")
+                    }
+                } header: {
+                    Text("Backup")
+                } footer: {
+                    Text("Your watch history, favorites, watchlist, and preferences — never your API key. Importing overwrites matching movies and replaces your language/genre/hidden preferences; it doesn't touch movies not in the backup.")
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: "1.0")
                     Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
@@ -86,6 +113,18 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .task { prepareExportFile() }
+            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
+                handleImport(result)
+            }
+            .alert("Backup", isPresented: Binding(
+                get: { backupAlertMessage != nil },
+                set: { if !$0 { backupAlertMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(backupAlertMessage ?? "")
+            }
         }
     }
 
@@ -121,6 +160,38 @@ struct SettingsView: View {
             validationError = error.errorDescription
         } catch {
             validationError = error.localizedDescription
+        }
+    }
+
+    private func prepareExportFile() {
+        let movies = (try? modelContext.fetch(FetchDescriptor<Movie>())) ?? []
+        guard let data = LibraryBackupService.export(movies: movies, settingsStore: settingsStore) else { return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("MovieSuggest-Backup.json")
+        try? data.write(to: url, options: .atomic)
+        exportURL = url
+    }
+
+    private func handleImport(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            importLibrary(from: url)
+        case .failure(let error):
+            backupAlertMessage = error.localizedDescription
+        }
+    }
+
+    private func importLibrary(from url: URL) {
+        guard url.startAccessingSecurityScopedResource() else {
+            backupAlertMessage = "Couldn't access that file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        do {
+            let data = try Data(contentsOf: url)
+            let count = try LibraryBackupService.restore(from: data, context: modelContext, settingsStore: settingsStore)
+            backupAlertMessage = "Restored \(count) movie(s) and your preferences."
+        } catch {
+            backupAlertMessage = error.localizedDescription
         }
     }
 }

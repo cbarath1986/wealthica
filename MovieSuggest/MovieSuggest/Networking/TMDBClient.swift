@@ -153,6 +153,10 @@ actor TMDBClient {
         try await request("/movie/\(movieID)/watch/providers")
     }
 
+    func videos(for movieID: Int) async throws -> TMDBVideosResponse {
+        try await request("/movie/\(movieID)/videos")
+    }
+
     /// Recently released movies in a given language, newest first. Unlike
     /// `discover`, this has no meaningful vote-count floor — a movie that
     /// released last week hasn't had time to accumulate many ratings yet,
@@ -183,6 +187,46 @@ actor TMDBClient {
                 for page in 1...max(1, pageCount) {
                     group.addTask { [self] in
                         (try? await self.newReleases(originalLanguage: language, page: page))?.results ?? []
+                    }
+                }
+            }
+            for await movies in group {
+                for movie in movies where moviesByID[movie.id] == nil {
+                    moviesByID[movie.id] = movie
+                }
+            }
+        }
+        return Array(moviesByID.values)
+    }
+
+    /// Movies releasing soon in a given language, soonest first. Like
+    /// `newReleases`, no vote-count floor — unreleased movies have no votes
+    /// at all yet.
+    func comingSoon(originalLanguage: String?, page: Int = 1) async throws -> TMDBPagedResponse<TMDBMovie> {
+        let today = Date()
+        let windowEnd = Calendar(identifier: .gregorian).date(byAdding: .day, value: 60, to: today) ?? today
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "sort_by", value: "primary_release_date.asc"),
+            URLQueryItem(name: "primary_release_date.gte", value: Self.dateOnlyFormatter.string(from: today)),
+            URLQueryItem(name: "primary_release_date.lte", value: Self.dateOnlyFormatter.string(from: windowEnd)),
+            URLQueryItem(name: "include_adult", value: "false"),
+            URLQueryItem(name: "page", value: String(page)),
+        ]
+        if let originalLanguage {
+            items.append(URLQueryItem(name: "with_original_language", value: originalLanguage))
+        }
+        return try await request("/discover/movie", query: items)
+    }
+
+    /// Fans out `comingSoon` across every language (concurrently),
+    /// deduplicated by id, mirroring `newReleasesPages`.
+    func comingSoonPages(languages: [String?], pageCount: Int) async -> [TMDBMovie] {
+        var moviesByID: [Int: TMDBMovie] = [:]
+        await withTaskGroup(of: [TMDBMovie].self) { group in
+            for language in languages {
+                for page in 1...max(1, pageCount) {
+                    group.addTask { [self] in
+                        (try? await self.comingSoon(originalLanguage: language, page: page))?.results ?? []
                     }
                 }
             }

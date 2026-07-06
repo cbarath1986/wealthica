@@ -37,6 +37,64 @@ final class Movie {
         addedAt = .now
     }
 
+    /// Restores a record from a backup — unlike `init(dto:)`, this carries
+    /// over the actual watched/favorite/watchlist state and timestamps.
+    init(record: LibraryBackup.MovieRecord) {
+        tmdbID = record.tmdbID
+        title = record.title
+        overview = record.overview
+        posterPath = record.posterPath
+        releaseDate = record.releaseDate
+        genreIDs = record.genreIDs
+        originalLanguage = record.originalLanguage
+        voteAverage = record.voteAverage
+        isWatched = record.isWatched
+        isFavorite = record.isFavorite
+        isWatchlisted = record.isWatchlisted
+        watchedAt = record.watchedAt
+        favoritedAt = record.favoritedAt
+        watchlistedAt = record.watchlistedAt
+        addedAt = record.addedAt
+    }
+
+    /// Applies a backup record's state onto an existing row (used when
+    /// restoring over a movie that's already in the library).
+    func apply(_ record: LibraryBackup.MovieRecord) {
+        title = record.title
+        overview = record.overview
+        posterPath = record.posterPath
+        releaseDate = record.releaseDate
+        genreIDs = record.genreIDs
+        originalLanguage = record.originalLanguage
+        voteAverage = record.voteAverage
+        isWatched = record.isWatched
+        isFavorite = record.isFavorite
+        isWatchlisted = record.isWatchlisted
+        watchedAt = record.watchedAt
+        favoritedAt = record.favoritedAt
+        watchlistedAt = record.watchlistedAt
+    }
+
+    var backupRecord: LibraryBackup.MovieRecord {
+        LibraryBackup.MovieRecord(
+            tmdbID: tmdbID,
+            title: title,
+            overview: overview,
+            posterPath: posterPath,
+            releaseDate: releaseDate,
+            genreIDs: genreIDs,
+            originalLanguage: originalLanguage,
+            voteAverage: voteAverage,
+            isWatched: isWatched,
+            isFavorite: isFavorite,
+            isWatchlisted: isWatchlisted,
+            watchedAt: watchedAt,
+            favoritedAt: favoritedAt,
+            watchlistedAt: watchlistedAt,
+            addedAt: addedAt
+        )
+    }
+
     var releaseYear: String? {
         releaseDate.map { String(Calendar.current.component(.year, from: $0)) }
     }

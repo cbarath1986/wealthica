@@ -127,3 +127,30 @@ struct TMDBWatchProvider: Decodable, Identifiable, Hashable {
 
     var id: Int { providerId }
 }
+
+// MARK: - Videos
+
+struct TMDBVideosResponse: Decodable {
+    let results: [TMDBVideo]
+
+    /// Prefers an official trailer, falling back to any trailer, then nil
+    /// if there isn't one on YouTube at all.
+    var bestYouTubeTrailer: TMDBVideo? {
+        let trailers = results.filter { $0.site == "YouTube" && $0.type == "Trailer" }
+        return trailers.first(where: \.official) ?? trailers.first
+    }
+}
+
+struct TMDBVideo: Decodable, Identifiable, Hashable {
+    let id: String
+    let key: String
+    let name: String
+    let site: String
+    let type: String
+    let official: Bool
+
+    var youTubeURL: URL? {
+        guard site == "YouTube" else { return nil }
+        return URL(string: "https://www.youtube.com/watch?v=\(key)")
+    }
+}

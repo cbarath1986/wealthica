@@ -66,4 +66,9 @@ final class SettingsStore: ObservableObject {
     func undismiss(_ movieID: Int) {
         dismissedMovieIDs.remove(movieID)
     }
+
+    /// Bulk-replaces the dismissed set — used when restoring a backup.
+    func restore(dismissedMovieIDs: Set<Int>) {
+        self.dismissedMovieIDs = dismissedMovieIDs
+    }
 }

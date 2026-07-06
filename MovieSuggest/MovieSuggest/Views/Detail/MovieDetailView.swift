@@ -20,6 +20,7 @@ struct MovieDetailView: View {
     @State private var similar: [TMDBMovie] = []
     @State private var credits: TMDBCredits?
     @State private var watchProviderRegion: TMDBWatchProviderRegion?
+    @State private var trailerURL: URL?
     @State private var loadError: String?
     @State private var showingMoreLikeThis = false
     @State private var selectedPerson: PersonRoute?
@@ -39,14 +40,28 @@ struct MovieDetailView: View {
         ScrollView {
             if let displayMovie {
                 VStack(alignment: .leading, spacing: 16) {
-                    AsyncImage(url: TMDBImage.backdrop(displayMovie.backdropPath ?? details?.backdropPath)) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable().aspectRatio(16 / 9, contentMode: .fill)
-                        } else {
-                            Rectangle().fill(.quaternary).aspectRatio(16 / 9, contentMode: .fill)
+                    ZStack {
+                        AsyncImage(url: TMDBImage.backdrop(displayMovie.backdropPath ?? details?.backdropPath)) { phase in
+                            if case .success(let image) = phase {
+                                image.resizable().aspectRatio(16 / 9, contentMode: .fill)
+                            } else {
+                                Rectangle().fill(.quaternary).aspectRatio(16 / 9, contentMode: .fill)
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                        if let trailerURL {
+                            Link(destination: trailerURL) {
+                                ZStack {
+                                    Circle().fill(.black.opacity(0.5)).frame(width: 60, height: 60)
+                                    Image(systemName: "play.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(.white)
+                                        .offset(x: 2)
+                                }
+                            }
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -302,6 +317,7 @@ struct MovieDetailView: View {
             async let recommendationsTask: TMDBPagedResponse<TMDBMovie>? = try? tmdbClient.recommendations(for: movieID)
             async let creditsTask: TMDBCredits? = try? tmdbClient.credits(for: movieID)
             async let providersTask: TMDBWatchProvidersResponse? = try? tmdbClient.watchProviders(for: movieID)
+            async let videosTask: TMDBVideosResponse? = try? tmdbClient.videos(for: movieID)
 
             details = try await detailsTask
 
@@ -317,6 +333,8 @@ struct MovieDetailView: View {
                 let regionCode = Locale.current.region?.identifier ?? "US"
                 watchProviderRegion = providersResponse.results[regionCode]
             }
+
+            trailerURL = await videosTask?.bestYouTubeTrailer?.youTubeURL
         } catch let error as TMDBError {
             loadError = error.errorDescription
         } catch {
