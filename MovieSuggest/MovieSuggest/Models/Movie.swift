@@ -73,6 +73,7 @@ final class Movie {
         watchedAt = record.watchedAt
         favoritedAt = record.favoritedAt
         watchlistedAt = record.watchlistedAt
+        addedAt = record.addedAt
     }
 
     var backupRecord: LibraryBackup.MovieRecord {
