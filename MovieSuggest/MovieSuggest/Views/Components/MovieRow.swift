@@ -41,7 +41,7 @@ struct MovieRow: View {
                     Image(systemName: "eye.fill").foregroundStyle(.secondary)
                 }
                 if isWatchlisted {
-                    Image(systemName: "bookmark.fill").foregroundStyle(.accentColor)
+                    Image(systemName: "bookmark.fill").foregroundStyle(Color.accentColor)
                 }
             }
             .font(.caption)
