@@ -26,6 +26,7 @@ enum LibraryBackupService {
         return decoder
     }
 
+    @MainActor
     static func export(movies: [Movie], settingsStore: SettingsStore) -> Data? {
         let backup = LibraryBackup(
             exportedAt: .now,
