@@ -12,6 +12,7 @@ final class SettingsStore: ObservableObject {
         static let strictGenreFilter = "strictGenreFilter"
         static let dismissedMovieIDs = "dismissedMovieIDs"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let isAIMoodSearchEnabled = "isAIMoodSearchEnabled"
     }
 
     private let defaults: UserDefaults
@@ -45,6 +46,13 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
     }
 
+    /// User-facing preference only — whether AI mood search is actually
+    /// usable also depends on `AIMoodAvailability.current` (device/OS
+    /// capability), which this store knows nothing about.
+    @Published var isAIMoodSearchEnabled: Bool {
+        didSet { defaults.set(isAIMoodSearchEnabled, forKey: Keys.isAIMoodSearchEnabled) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let saved = defaults.array(forKey: Keys.preferredLanguages) as? [String], !saved.isEmpty {
@@ -57,6 +65,7 @@ final class SettingsStore: ObservableObject {
         strictGenreFilter = defaults.bool(forKey: Keys.strictGenreFilter)
         dismissedMovieIDs = Set(defaults.array(forKey: Keys.dismissedMovieIDs) as? [Int] ?? [])
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
+        isAIMoodSearchEnabled = defaults.object(forKey: Keys.isAIMoodSearchEnabled) as? Bool ?? true
     }
 
     func dismiss(_ movieID: Int) {

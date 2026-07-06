@@ -89,4 +89,14 @@ final class TMDBModelDecodingTests: XCTestCase {
         let response = try decoder.decode(TMDBGenreListResponse.self, from: json)
         XCTAssertEqual(response.genres.count, 2)
     }
+
+    func testDecodesKeywordSearchResponse() throws {
+        let json = """
+        { "results": [{"id": 9748, "name": "feel-good"}, {"id": 156021, "name": "uplifting"}] }
+        """.data(using: .utf8)!
+
+        let response = try decoder.decode(TMDBKeywordSearchResponse.self, from: json)
+        XCTAssertEqual(response.results.map(\.name), ["feel-good", "uplifting"])
+        XCTAssertEqual(response.results.first?.id, 9748)
+    }
 }

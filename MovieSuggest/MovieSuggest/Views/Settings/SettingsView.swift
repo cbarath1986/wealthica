@@ -73,6 +73,27 @@ struct SettingsView: View {
                     Toggle("Only Preferred Genres", isOn: $settingsStore.strictGenreFilter)
                 }
 
+                Section {
+                    if aiMoodAvailability.isAvailable {
+                        Toggle("AI-Powered Mood Search", isOn: $settingsStore.isAIMoodSearchEnabled)
+                    } else {
+                        HStack {
+                            Text("AI-Powered Mood Search")
+                            Spacer()
+                            Text("Unavailable").foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Mood Search")
+                } footer: {
+                    if case .unavailable(let reason) = aiMoodAvailability {
+                        Text(reason)
+                    } else {
+                        Text("Describe a mood in your own words and Apple Intelligence turns it into a search — entirely on-device, nothing leaves your phone. Mood tag chips work either way.")
+                    }
+                }
+
                 Section("Not Interested") {
                     NavigationLink {
                         HiddenMoviesView()
@@ -127,6 +148,8 @@ struct SettingsView: View {
             }
         }
     }
+
+    private var aiMoodAvailability: AIMoodAvailability { AIMoodAvailability.current }
 
     private var maskedKey: String {
         guard let key = APIKeyStore.currentKey(), key.count > 4 else { return "Not set" }

@@ -128,6 +128,20 @@ struct TMDBWatchProvider: Decodable, Identifiable, Hashable {
     var id: Int { providerId }
 }
 
+// MARK: - Keywords
+
+/// TMDB keyword ids aren't documented/stable, so mood search resolves
+/// human-readable names to ids at runtime via `/search/keyword` rather than
+/// hardcoding them (see `MoodKeywordResolver`).
+struct TMDBKeywordSearchResponse: Decodable {
+    let results: [TMDBKeyword]
+}
+
+struct TMDBKeyword: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+}
+
 // MARK: - Videos
 
 struct TMDBVideosResponse: Decodable {

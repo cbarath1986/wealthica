@@ -69,7 +69,7 @@ actor TMDBClient {
         try await request("/trending/movie/week")
     }
 
-    func discover(genreIDs: [Int], originalLanguage: String?, page: Int = 1) async throws -> TMDBPagedResponse<TMDBMovie> {
+    func discover(genreIDs: [Int], originalLanguage: String?, page: Int = 1, keywordIDs: [Int] = []) async throws -> TMDBPagedResponse<TMDBMovie> {
         // 200 sounds like a low bar but is actually steep for most non-
         // Hollywood cinema — many well-regarded regional-language films
         // simply never accumulate that many TMDB user ratings. 30 still
@@ -88,6 +88,9 @@ actor TMDBClient {
         if let originalLanguage {
             items.append(URLQueryItem(name: "with_original_language", value: originalLanguage))
         }
+        if !keywordIDs.isEmpty {
+            items.append(URLQueryItem(name: "with_keywords", value: keywordIDs.map(String.init).joined(separator: "|")))
+        }
         return try await request("/discover/movie", query: items)
     }
 
@@ -97,13 +100,13 @@ actor TMDBClient {
     /// several pages is what keeps the candidate pool large enough to
     /// survive quality and library-exclusion filtering downstream instead
     /// of collapsing to a handful of results.
-    func discoverPages(genreIDs: [Int], languages: [String?], pageCount: Int) async -> [TMDBMovie] {
+    func discoverPages(genreIDs: [Int], languages: [String?], pageCount: Int, keywordIDs: [Int] = []) async -> [TMDBMovie] {
         var moviesByID: [Int: TMDBMovie] = [:]
         await withTaskGroup(of: [TMDBMovie].self) { group in
             for language in languages {
                 for page in 1...max(1, pageCount) {
                     group.addTask { [self] in
-                        (try? await self.discover(genreIDs: genreIDs, originalLanguage: language, page: page))?.results ?? []
+                        (try? await self.discover(genreIDs: genreIDs, originalLanguage: language, page: page, keywordIDs: keywordIDs))?.results ?? []
                     }
                 }
             }
@@ -114,6 +117,16 @@ actor TMDBClient {
             }
         }
         return Array(moviesByID.values)
+    }
+
+    /// Text search over TMDB's keyword taxonomy — used to resolve a
+    /// human-readable mood word (e.g. "feel-good") to the numeric keyword
+    /// id `with_keywords` needs, since those ids aren't documented/stable.
+    func searchKeyword(query: String) async throws -> [TMDBKeyword] {
+        let response: TMDBKeywordSearchResponse = try await request("/search/keyword", query: [
+            URLQueryItem(name: "query", value: query),
+        ])
+        return response.results
     }
 
     func movieDetails(id: Int) async throws -> TMDBMovieDetails {
