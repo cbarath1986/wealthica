@@ -180,28 +180,44 @@ struct MovieDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(providers) { provider in
-                            VStack(spacing: 4) {
-                                AsyncImage(url: TMDBImage.provider(provider.logoPath)) { phase in
-                                    if case .success(let image) = phase {
-                                        image.resizable()
-                                    } else {
-                                        Rectangle().fill(.quaternary)
-                                    }
-                                }
-                                .frame(width: 44, height: 44)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                                Text(provider.providerName)
-                                    .font(.caption2)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .frame(width: 64)
-                            }
+                            providerButton(provider, watchLink: region.link)
                         }
                     }
                 }
             }
             .padding(.horizontal)
+        }
+    }
+
+    /// TMDB gives one shared "watch" link per region, not a separate deep
+    /// link per provider — there's no per-title URL into Netflix/Prime/etc.
+    /// individually. Tapping any logo opens that shared page, which itself
+    /// links out to each service for this specific title.
+    @ViewBuilder
+    private func providerButton(_ provider: TMDBWatchProvider, watchLink: String?) -> some View {
+        let content = VStack(spacing: 4) {
+            AsyncImage(url: TMDBImage.provider(provider.logoPath)) { phase in
+                if case .success(let image) = phase {
+                    image.resizable()
+                } else {
+                    Rectangle().fill(.quaternary)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Text(provider.providerName)
+                .font(.caption2)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 64)
+        }
+
+        if let watchLink, let url = URL(string: watchLink) {
+            Link(destination: url) { content }
+                .buttonStyle(.plain)
+        } else {
+            content
         }
     }
 
