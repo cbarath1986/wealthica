@@ -78,6 +78,18 @@ final class MoodSearchViewModel: ObservableObject {
                     .filter { genre in parsed.genreNames.contains { $0.caseInsensitiveCompare(genre.name) == .orderedSame } }
                     .map(\.id)
                 await runSearch(keywordNames: parsed.keywords, genreIDs: genreIDs, preferredLanguages: preferredLanguages, dismissedMovieIDs: dismissedMovieIDs)
+                guard !Task.isCancelled else { return }
+                // The AI's keywords/genre names are free-form and TMDB's
+                // keyword search is a literal text match over its own fixed
+                // vocabulary, so a perfectly reasonable mood description can
+                // still resolve to zero keyword/genre ids (or ids that just
+                // have no matching movies). Rather than dead-end there, fall
+                // back to a plain TMDB title/overview search on the user's
+                // original text so a request essentially never comes back
+                // completely empty.
+                if results.isEmpty {
+                    await fallbackTextSearch(text, dismissedMovieIDs: dismissedMovieIDs)
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 isLoading = false
@@ -108,5 +120,17 @@ final class MoodSearchViewModel: ObservableObject {
             .filter { !dismissedMovieIDs.contains($0.id) }
             .sorted { ($0.popularity ?? 0) > ($1.popularity ?? 0) }
         Log.network.debug("Mood search -> \(self.results.count, privacy: .public) results")
+    }
+
+    private func fallbackTextSearch(_ text: String, dismissedMovieIDs: Set<Int>) async {
+        isLoading = true
+        defer { isLoading = false }
+        guard let response = try? await tmdbClient.searchMovies(query: text) else { return }
+        guard !Task.isCancelled else { return }
+        let filtered = response.results.filter { !dismissedMovieIDs.contains($0.id) }
+        guard !filtered.isEmpty else { return }
+        results = filtered
+        errorMessage = nil
+        Log.network.debug("Mood search: keyword/genre resolution came up empty, fell back to text search -> \(filtered.count, privacy: .public) results")
     }
 }
