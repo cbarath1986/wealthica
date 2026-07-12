@@ -6,7 +6,9 @@ struct OnboardingView: View {
 
     private enum Step { case apiKey, languages }
 
-    @State private var step: Step = .apiKey
+    /// Builds that ship a built-in TMDB key have nothing to ask for on the
+    /// key step, so onboarding starts straight at language selection.
+    @State private var step: Step = DefaultAPIKey.isConfigured ? .languages : .apiKey
     @State private var apiKeyInput = ""
     @State private var isValidating = false
     @State private var validationError: String?

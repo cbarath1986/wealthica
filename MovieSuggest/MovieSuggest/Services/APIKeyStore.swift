@@ -8,7 +8,18 @@ enum APIKeyStore {
     private static let service = "MovieSuggest.TMDB"
     private static let account = "apiKey"
 
+    /// The key requests should actually use: a personal key from the
+    /// Keychain wins, otherwise the built-in distribution key (if this
+    /// build ships one), otherwise nil — which is what gates onboarding.
     static func currentKey() -> String? {
+        if let personal = personalKey() { return personal }
+        return DefaultAPIKey.isConfigured ? DefaultAPIKey.key : nil
+    }
+
+    /// Only the user's own Keychain-stored key, ignoring any built-in one —
+    /// lets Settings distinguish "using your key" from "using the built-in
+    /// key".
+    static func personalKey() -> String? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

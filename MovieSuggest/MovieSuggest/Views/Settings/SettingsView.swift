@@ -12,6 +12,10 @@ struct SettingsView: View {
     @State private var isEditingKey = false
     @State private var isValidating = false
     @State private var validationError: String?
+    /// Mirrored into state (rather than read from the Keychain in a
+    /// computed property) so removing/saving a key re-renders the section —
+    /// a Keychain change alone is invisible to SwiftUI.
+    @State private var hasPersonalKey = APIKeyStore.personalKey() != nil
 
     @State private var exportURL: URL?
     @State private var isImporting = false
@@ -20,7 +24,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("TMDB API Key") {
+                Section {
                     if isEditingKey {
                         SecureField("Paste your TMDB API key", text: $apiKeyInput)
                             .textInputAutocapitalization(.never)
@@ -38,12 +42,30 @@ struct SettingsView: View {
                         HStack {
                             Text(maskedKey)
                             Spacer()
-                            Button("Update") { apiKeyInput = ""; isEditingKey = true }
+                            Button(hasPersonalKey ? "Update" : "Use My Own Key") {
+                                apiKeyInput = ""
+                                isEditingKey = true
+                            }
                         }
-                        Button("Remove Key", role: .destructive) {
-                            APIKeyStore.remove()
-                            settingsStore.hasCompletedOnboarding = false
+                        if hasPersonalKey {
+                            Button("Remove Key", role: .destructive) {
+                                APIKeyStore.remove()
+                                hasPersonalKey = false
+                                // With a built-in key the app keeps working
+                                // (requests fall back to it); without one
+                                // there's nothing left to call TMDB with, so
+                                // return to onboarding.
+                                if !DefaultAPIKey.isConfigured {
+                                    settingsStore.hasCompletedOnboarding = false
+                                }
+                            }
                         }
+                    }
+                } header: {
+                    Text("TMDB API Key")
+                } footer: {
+                    if DefaultAPIKey.isConfigured && !hasPersonalKey {
+                        Text("This app includes a shared TMDB key so it works out of the box. Adding your own free key gives you your own rate limit.")
                     }
                 }
 
@@ -127,7 +149,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "1.0")
+                    LabeledContent("Version", value: appVersion)
                     Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -151,9 +173,17 @@ struct SettingsView: View {
 
     private var aiMoodAvailability: AIMoodAvailability { AIMoodAvailability.current }
 
+    private var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return build.map { "\(version) (\($0))" } ?? version
+    }
+
     private var maskedKey: String {
-        guard let key = APIKeyStore.currentKey(), key.count > 4 else { return "Not set" }
-        return "••••" + key.suffix(4)
+        if hasPersonalKey, let key = APIKeyStore.personalKey(), key.count > 4 {
+            return "••••" + key.suffix(4)
+        }
+        return DefaultAPIKey.isConfigured ? "Built-in key" : "Not set"
     }
 
     private var languageSummary: String {
@@ -178,6 +208,7 @@ struct SettingsView: View {
         do {
             try await tmdbClient.validate(apiKey: apiKeyInput)
             APIKeyStore.save(apiKeyInput)
+            hasPersonalKey = true
             isEditingKey = false
         } catch let error as TMDBError {
             validationError = error.errorDescription

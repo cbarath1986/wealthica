@@ -89,6 +89,41 @@ Your watch history, favorites, and settings never leave your device — they're 
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
 
+## App Store launch checklist
+
+The code is App Store-ready; the remaining steps are account/config work
+that must happen on your side:
+
+1. **Join the Apple Developer Program** ($99/year) at
+   [developer.apple.com](https://developer.apple.com/programs/), and sign in
+   to Xcode with that account (Xcode → Settings → Accounts).
+2. **Set your bundle identifier.** In the project's Signing & Capabilities
+   tab, change `com.example.MovieSuggest` to your own reverse-domain id
+   (e.g. `com.yourname.moviesuggest`) and select your team. Do the same for
+   the test target.
+3. **Embed a TMDB key** so users don't have to bring their own: paste your
+   key into `MovieSuggest/Services/DefaultAPIKey.swift`. Onboarding then
+   skips the key screen entirely; users can still add a personal key in
+   Settings. Leave it empty to keep the bring-your-own-key flow.
+   (TMDB's free API is for non-commercial use — keep the app free, keep the
+   attribution, and don't add ads or purchases without a TMDB commercial
+   agreement.)
+4. **Host the privacy policy** — `PRIVACY.md` in this repo is written to
+   match exactly what the app does. Put it anywhere public (GitHub Pages
+   works) and use that URL in App Store Connect.
+5. **App Privacy questionnaire** in App Store Connect: answer
+   **"Data Not Collected"** — the app has no analytics, accounts, or
+   tracking, and the included `PrivacyInfo.xcprivacy` manifest already
+   declares the same.
+6. **TestFlight first**: Product → Archive → Distribute App → TestFlight.
+   Use it yourself for a week; then submit the same build for App Store
+   review with screenshots (6.7" and 6.1" sizes cover current requirements)
+   and a short description.
+7. In the reviewer notes, mention: no account is needed, all data is
+   on-device, and the AI mood search only appears on Apple
+   Intelligence-capable devices (reviewers on older hardware will simply
+   not see it — that's by design, not a broken feature).
+
 ## Troubleshooting
 
 - **"TMDB rejected the API key"** — double-check you copied the v3 API key (not the "Read Access Token"), and re-enter it in Settings.
